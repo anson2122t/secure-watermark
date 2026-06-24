@@ -13,6 +13,11 @@ const settings = { ...defaultSettings };
 
 const fileInput = document.querySelector('#fileInput');
 const uploadArea = document.querySelector('#uploadArea');
+const uploadSection = document.querySelector('#uploadSection');
+const workspace = document.querySelector('.workspace');
+const controlsPanel = document.querySelector('.controls-panel');
+const previewPanel = document.querySelector('.preview-panel');
+const settingsSection = document.querySelector('.settings-section');
 const previewCanvas = document.querySelector('#previewCanvas');
 const watermarkTextInput = document.querySelector('#watermarkText');
 const fontSizeInput = document.querySelector('#fontSize');
@@ -55,6 +60,9 @@ const controls = [
 let loadedImage = null;
 let loadedFileName = '';
 let renderFrame = null;
+let shouldHideUploadOnPhone = false;
+
+const phoneLayoutQuery = window.matchMedia('(max-width: 640px)');
 
 function init() {
   if (!window.FileReader || !window.Blob || !previewCanvas.getContext) {
@@ -65,6 +73,8 @@ function init() {
   syncControlsFromSettings();
   updateControlsState();
   updateValueLabels();
+  updateResponsiveUploadLayout();
+  bindMediaQueryChange(phoneLayoutQuery, updateResponsiveUploadLayout);
 
   fileInput.addEventListener('change', () => {
     const [file] = fileInput.files;
@@ -127,8 +137,11 @@ function handleFile(file) {
     .then((image) => {
       loadedImage = image;
       loadedFileName = file.name;
+      shouldHideUploadOnPhone = true;
+      updatePreviewAspectClass(image);
       renderCanvas();
       updateControlsState();
+      updateResponsiveUploadLayout();
       imageMeta.textContent = `${loadedFileName} · ${image.naturalWidth} × ${image.naturalHeight}px`;
     })
     .catch(() => {
@@ -241,6 +254,8 @@ function updateValueLabels() {
 }
 
 function resetSettings() {
+  shouldHideUploadOnPhone = false;
+  updateResponsiveUploadLayout();
   Object.assign(settings, defaultSettings);
   syncControlsFromSettings();
   updateValueLabels();
@@ -332,6 +347,36 @@ function updatePreviewVisibility() {
   const hasImage = Boolean(loadedImage);
   previewCanvas.classList.toggle('is-visible', hasImage);
   emptyPreview.classList.toggle('is-hidden', hasImage);
+}
+
+function updatePreviewAspectClass(image) {
+  const isPortrait = image.naturalHeight / image.naturalWidth >= 1.3;
+  previewPanel.classList.toggle('is-portrait-preview', isPortrait);
+}
+
+function updateResponsiveUploadLayout() {
+  const useInlinePreview = shouldHideUploadOnPhone && phoneLayoutQuery.matches;
+
+  uploadSection.hidden = useInlinePreview;
+  previewPanel.classList.toggle('is-inline-mobile-preview', useInlinePreview);
+
+  if (useInlinePreview) {
+    controlsPanel.insertBefore(previewPanel, settingsSection);
+    return;
+  }
+
+  if (previewPanel.parentElement !== workspace) {
+    workspace.insertBefore(previewPanel, controlsPanel.nextSibling);
+  }
+}
+
+function bindMediaQueryChange(mediaQuery, handler) {
+  if (typeof mediaQuery.addEventListener === 'function') {
+    mediaQuery.addEventListener('change', handler);
+    return;
+  }
+
+  mediaQuery.addListener(handler);
 }
 
 function getCanvasFontFamily() {
