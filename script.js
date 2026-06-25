@@ -9,6 +9,15 @@ const defaultSettings = {
   jpgQuality: 0.92
 };
 
+const THEME_STORAGE_KEY = 'secure-watermark-theme';
+const DEFAULT_THEME = 'dark-purple';
+const LIGHT_THEME = 'light';
+const DARK_PURPLE_THEME = 'dark-purple';
+const THEME_COLORS = {
+  [DARK_PURPLE_THEME]: '#160d28',
+  [LIGHT_THEME]: '#ffffff'
+};
+
 const settings = { ...defaultSettings };
 
 const fileInput = document.querySelector('#fileInput');
@@ -42,6 +51,8 @@ const jpgQualityValue = document.querySelector('#jpgQualityValue');
 const errorMessage = document.querySelector('#errorMessage');
 const emptyPreview = document.querySelector('#emptyPreview');
 const imageMeta = document.querySelector('#imageMeta');
+const themeToggle = document.querySelector('#themeToggle');
+const themeColorMeta = document.querySelector('meta[name="theme-color"]');
 
 const canvasContext = previewCanvas.getContext('2d');
 const controls = [
@@ -61,10 +72,14 @@ let loadedImage = null;
 let loadedFileName = '';
 let renderFrame = null;
 let shouldHideUploadOnPhone = false;
+let currentTheme = DEFAULT_THEME;
 
 const phoneLayoutQuery = window.matchMedia('(max-width: 640px)');
 
 function init() {
+  applyTheme(getStoredTheme(), { persist: false });
+  bindThemeToggle();
+
   if (!window.FileReader || !window.Blob || !previewCanvas.getContext) {
     showError('你的瀏覽器不支援必要圖片處理 API，請改用較新版本瀏覽器。');
     return;
@@ -118,6 +133,68 @@ function init() {
   resetPreviewButton.addEventListener('click', resetSettings);
   downloadPngButton.addEventListener('click', () => downloadImage('png'));
   downloadJpgButton.addEventListener('click', () => downloadImage('jpg'));
+}
+
+function bindThemeToggle() {
+  if (!themeToggle) {
+    return;
+  }
+
+  themeToggle.addEventListener('click', () => {
+    const nextTheme = currentTheme === DARK_PURPLE_THEME ? LIGHT_THEME : DARK_PURPLE_THEME;
+    applyTheme(nextTheme, { persist: true });
+  });
+}
+
+function getStoredTheme() {
+  try {
+    const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    return isSupportedTheme(storedTheme) ? storedTheme : DEFAULT_THEME;
+  } catch (error) {
+    return DEFAULT_THEME;
+  }
+}
+
+function persistTheme(theme) {
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch (error) {
+    // The selected theme still applies for this page load when storage is unavailable.
+  }
+}
+
+function applyTheme(theme, options = { persist: true }) {
+  const safeTheme = isSupportedTheme(theme) ? theme : DEFAULT_THEME;
+
+  currentTheme = safeTheme;
+  document.documentElement.dataset.theme = safeTheme;
+
+  if (themeColorMeta) {
+    themeColorMeta.content = THEME_COLORS[safeTheme];
+  }
+
+  syncThemeToggle();
+
+  if (options.persist) {
+    persistTheme(safeTheme);
+  }
+}
+
+function syncThemeToggle() {
+  if (!themeToggle) {
+    return;
+  }
+
+  const isDarkTheme = currentTheme === DARK_PURPLE_THEME;
+  const label = isDarkTheme ? '切換至淺色主題' : '切換至深紫暗黑主題';
+
+  themeToggle.setAttribute('aria-label', label);
+  themeToggle.setAttribute('aria-pressed', String(isDarkTheme));
+  themeToggle.title = label;
+}
+
+function isSupportedTheme(theme) {
+  return theme === LIGHT_THEME || theme === DARK_PURPLE_THEME;
 }
 
 function handleFile(file) {
